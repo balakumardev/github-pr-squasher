@@ -2,7 +2,8 @@
 
 A browser userscript that adds a "Squash & Recreate PR" button to GitHub pull requests. It creates a new PR with squashed commits while preserving the original description.
 
-![PR Squasher Button](screenshots/button.png) *TODO*
+![PR Squasher Button](screenshots/button.png)
+TODO
 
 ## Features
 
@@ -12,6 +13,7 @@ A browser userscript that adds a "Squash & Recreate PR" button to GitHub pull re
 - 🗑️ Deletes original branch
 - 🔒 Secure token storage
 - ⏳ Progress indicators
+- 🏢 Supports GitHub Enterprise
 
 ## Installation
 
@@ -22,7 +24,7 @@ A browser userscript that adds a "Squash & Recreate PR" button to GitHub pull re
    - Firefox: [Tampermonkey](https://addons.mozilla.org/en-US/firefox/addon/tampermonkey/)
    - Edge: [Tampermonkey](https://microsoftedge.microsoft.com/addons/detail/tampermonkey/iikmkjmpaadaobahmlepeloendndfphd)
 
-2. Install the script from [Greasy Fork](https://greasyfork.org/en/scripts/TODO)
+2. Install the script from [Greasy Fork](https://greasyfork.org/en/scripts/523100-github-pr-squasher)
 
 ### Method 2: Manual Installation
 
@@ -33,17 +35,21 @@ A browser userscript that adds a "Squash & Recreate PR" button to GitHub pull re
 
 ## Setup
 
-After installation, you need to set up your GitHub token:
+1. Generate a GitHub token:
+   - Go to [GitHub Settings → Developer Settings → Personal Access Tokens → Tokens (classic)](https://github.com/settings/tokens)
+   - Click "Generate new token (classic)"
+   - Give it a name (e.g., "PR Squasher")
+   - Select the `repo` permission
+   - Copy the generated token (starts with `ghp_`)
 
-1. Go to [GitHub Settings → Developer Settings → Personal Access Tokens → Tokens (classic)](https://github.com/settings/tokens)
-2. Click "Generate new token (classic)"
-3. Give it a name (e.g., "PR Squasher")
-4. Select the `repo` permission
-5. Copy the generated token (starts with `ghp_`)
-6. Click the Tampermonkey icon in your browser
-7. Select "Set GitHub Token"
-8. Paste your token
-9. Refresh GitHub
+2. Configure the script:
+   - Click the Tampermonkey icon in your browser
+   - Select "Set GitHub Token"
+   - Paste your token
+   - For GitHub Enterprise users:
+      - Select "Set Enterprise Domain"
+      - Enter your GitHub Enterprise domain (e.g., github.mycompany.com)
+   - Refresh GitHub
 
 ## Usage
 
@@ -58,16 +64,6 @@ After installation, you need to set up your GitHub token:
    - Close the original PR
    - Delete the original branch
    - Redirect you to the new PR
-
-## How It Works
-
-The script:
-1. Uses GitHub's REST API to handle all operations
-2. Creates a new branch from the base branch
-3. Creates a single commit with all changes
-4. Creates a new PR with the squashed commit
-5. Preserves all PR context and description
-6. Cleans up by closing the original PR and deleting its branch
 
 ## Development
 
@@ -105,3 +101,4 @@ MIT License - see [LICENSE](LICENSE) for details
 - Token management
 - Progress indicators
 - Automatic branch deletion
+- GitHub Enterprise support
