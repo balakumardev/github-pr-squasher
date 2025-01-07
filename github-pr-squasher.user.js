@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GitHub PR Squasher
 // @namespace    https://github.com/balakumardev/github-pr-squasher
-// @version      1.0.0
+// @version      1.1.0
 // @description  One-click tool to squash GitHub Pull Requests. Creates a new PR with squashed commits and preserves the description.
 // @author       Bala Kumar
 // @license      MIT
