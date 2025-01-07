@@ -1,23 +1,26 @@
 // ==UserScript==
 // @name         GitHub PR Squasher
-// @namespace    https://github.com/balakumardev
+// @namespace    https://github.com/balakumardev/github-pr-squasher
 // @version      1.0.0
 // @description  One-click tool to squash GitHub Pull Requests. Creates a new PR with squashed commits and preserves the description.
 // @author       Bala Kumar
 // @license      MIT
 // @match        https://github.com/*
+// @match        https://*.github.com/*
+// @match        https://*.github.io/*
+// @match        https://*.githubusercontent.com/*
 // @icon         https://github.githubassets.com/favicons/favicon.svg
 // @grant        GM_xmlhttpRequest
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_registerMenuCommand
 // @connect      api.github.com
+// @connect      *
 // @supportURL   https://github.com/balakumardev/github-pr-squasher/issues
 // @homepage     https://github.com/balakumardev/github-pr-squasher
-// @require      https://raw.githubusercontent.com/balakumardev/github-pr-squasher/main/github-pr-squasher.user.js
 // ==/UserScript==
 
-/* 
+/*
 ===========================================
 GitHub PR Squasher
 ===========================================
@@ -48,13 +51,11 @@ GitHub Token Instructions:
 Support: mail@balakumar.dev
 */
 
-
 (function() {
     'use strict';
 
     const DEBUG = true;
 
-    // Add settings menu to Tampermonkey
     GM_registerMenuCommand('Set GitHub Token', async () => {
         const token = prompt('Enter your GitHub Personal Access Token (Classic):', GM_getValue('github_token', ''));
         if (token !== null) {
@@ -67,8 +68,36 @@ Support: mail@balakumar.dev
         }
     });
 
+    GM_registerMenuCommand('Set Enterprise Domain', async () => {
+        const currentDomain = GM_getValue('github_enterprise_domain', '');
+        const domain = prompt(
+            'Enter your GitHub Enterprise domain (leave empty for github.com):\nExample: github.mycompany.com',
+            currentDomain
+        );
+        if (domain !== null) {
+            await GM_setValue('github_enterprise_domain', domain.trim());
+            alert('Domain saved! Please refresh the page.');
+        }
+    });
+
     function debugLog(...args) {
         if (DEBUG) console.log('[PR Squasher]', ...args);
+    }
+
+    function getGitHubDomain() {
+        const enterpriseDomain = GM_getValue('github_enterprise_domain', '').trim();
+        if (enterpriseDomain && window.location.hostname.includes(enterpriseDomain)) {
+            return enterpriseDomain;
+        }
+        return 'github.com';
+    }
+
+    function getAPIBaseURL() {
+        const domain = getGitHubDomain();
+        if (domain === 'github.com') {
+            return 'https://api.github.com';
+        }
+        return `https://${domain}/api/v3`;
     }
 
     async function getGitHubToken() {
@@ -84,11 +113,13 @@ Support: mail@balakumar.dev
         if (body) debugLog('Request Body:', body);
 
         const token = await getGitHubToken();
+        const baseURL = getAPIBaseURL();
+        const url = endpoint.startsWith('http') ? endpoint : `${baseURL}${endpoint}`;
 
         return new Promise((resolve, reject) => {
             GM_xmlhttpRequest({
                 method: method,
-                url: `https://api.github.com${endpoint}`,
+                url: url,
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Accept': 'application/vnd.github.v3+json',
@@ -103,7 +134,6 @@ Support: mail@balakumar.dev
                     });
 
                     if (response.status >= 200 && response.status < 300 || (method === 'DELETE' && response.status === 404)) {
-                        // Allow 404 for DELETE operations as the resource might already be gone
                         resolve(response.responseText ? JSON.parse(response.responseText) : {});
                     } else {
                         reject(new Error(`GitHub API error: ${response.status} - ${response.responseText}`));
@@ -123,10 +153,8 @@ Support: mail@balakumar.dev
         button.innerHTML = '⏳ Starting...';
 
         try {
-            // Verify token exists
             await getGitHubToken();
 
-            // Step 1: Get basic PR info
             const prInfo = {
                 owner: window.location.pathname.split('/')[1],
                 repo: window.location.pathname.split('/')[2],
@@ -138,29 +166,24 @@ Support: mail@balakumar.dev
             };
             debugLog('PR Info:', prInfo);
 
-            // Step 2: Get PR details
             button.innerHTML = '⏳ Getting PR details...';
             const prDetails = await githubAPI(`/repos/${prInfo.owner}/${prInfo.repo}/pulls/${prInfo.prNumber}`);
             debugLog('PR Details:', prDetails);
 
-            // Step 3: Get the head commit's tree
             button.innerHTML = '⏳ Getting tree...';
             const headCommit = await githubAPI(`/repos/${prInfo.owner}/${prInfo.repo}/git/commits/${prDetails.head.sha}`);
             debugLog('Head Commit:', headCommit);
 
-            // Step 4: Create new branch name
             const timestamp = new Date().getTime();
             const newBranchName = `squashed-pr-${prInfo.prNumber}-${timestamp}`;
             debugLog('New Branch Name:', newBranchName);
 
-            // Step 5: Create new branch from base
             button.innerHTML = '⏳ Creating new branch...';
             await githubAPI(`/repos/${prInfo.owner}/${prInfo.repo}/git/refs`, 'POST', {
                 ref: `refs/heads/${newBranchName}`,
                 sha: prDetails.base.sha
             });
 
-            // Step 6: Create squashed commit
             button.innerHTML = '⏳ Creating squashed commit...';
             const newCommit = await githubAPI(`/repos/${prInfo.owner}/${prInfo.repo}/git/commits`, 'POST', {
                 message: `${prInfo.title}\n\nSquashed commits from #${prInfo.prNumber}`,
@@ -169,14 +192,12 @@ Support: mail@balakumar.dev
             });
             debugLog('New Commit:', newCommit);
 
-            // Step 7: Update branch reference
             button.innerHTML = '⏳ Updating branch...';
             await githubAPI(`/repos/${prInfo.owner}/${prInfo.repo}/git/refs/heads/${newBranchName}`, 'PATCH', {
                 sha: newCommit.sha,
                 force: true
             });
 
-            // Step 8: Create new PR
             button.innerHTML = '⏳ Creating new PR...';
             const newPR = await githubAPI(`/repos/${prInfo.owner}/${prInfo.repo}/pulls`, 'POST', {
                 title: `${prInfo.title} (Squashed)`,
@@ -185,22 +206,18 @@ Support: mail@balakumar.dev
                 body: `${prInfo.description}\n\n---\n_Squashed version of #${prInfo.prNumber}_`
             });
 
-            // Step 9: Close original PR
             button.innerHTML = '⏳ Cleaning up...';
             await githubAPI(`/repos/${prInfo.owner}/${prInfo.repo}/pulls/${prInfo.prNumber}`, 'PATCH', {
                 state: 'closed'
             });
 
-            // Step 10: Delete original branch
             try {
                 await githubAPI(`/repos/${prInfo.owner}/${prInfo.repo}/git/refs/heads/${prInfo.branch}`, 'DELETE');
                 debugLog('Deleted original branch:', prInfo.branch);
             } catch (error) {
                 debugLog('Failed to delete original branch:', error);
-                // Continue even if branch deletion fails
             }
 
-            // Success! Redirect to new PR
             window.location.href = newPR.html_url;
 
         } catch (error) {
@@ -226,10 +243,8 @@ Support: mail@balakumar.dev
         }
     }
 
-    // Add button when page loads
     addSquashButton();
 
-    // Add button when navigation occurs
     const observer = new MutationObserver(() => {
         if (window.location.href.includes('/pull/')) {
             addSquashButton();
